@@ -296,7 +296,7 @@ export const UploadScreen: React.FC<UploadScreenProps> = ({ onWorkflowComplete }
           <div className="text-center">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            DealSense AI • Intelligent Extraction Engine
+            Build IQ • Intelligent Extraction Engine
           </span>
           </div>
 

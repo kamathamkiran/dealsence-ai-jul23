@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Lock, User, ShieldCheck, LogIn, Sparkles } from 'lucide-react';
+import { Lock, User, ShieldCheck, LogIn } from 'lucide-react';
+import iconLogo from '../assets/download-no-bg.png';
 
 interface LoginScreenProps {
   onLogin: (username: string, password: string) => void;
@@ -17,15 +18,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, error }) => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] grid-background flex items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-md space-y-5">
-        <div className="text-center">
-          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            DealSense AI • Secure Access
-          </span>
+      <style>{`
+        @keyframes logoBlinkGlow {
+          0%, 100% { opacity: 1; filter: drop-shadow(0 2px 10px rgba(59, 130, 246, 0.15)); }
+          50% { opacity: 0.84; filter: drop-shadow(0 6px 22px rgba(90, 53, 243, 0.32)); }
+        }
+      `}</style>
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+        <div className="text-center lg:text-left">
+          <img
+            src={iconLogo}
+            alt="Build1 logo"
+            className="mx-auto lg:mx-0 w-4/5 lg:w-full h-auto object-contain rounded-2xl"
+            style={{ animation: 'logoBlinkGlow 2.2s ease-in-out infinite' }}
+          />
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-7 space-y-5">
+        <div className="w-full max-w-md mx-auto bg-white rounded-2xl border border-slate-200 shadow-xl p-7 space-y-5">
           <div className="space-y-1.5 text-center">
             <h1 className="text-xl font-extrabold text-slate-900">Login to Continue</h1>
             <p className="text-xs text-slate-500">
@@ -90,4 +99,3 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, error }) => {
     </div>
   );
 };
-

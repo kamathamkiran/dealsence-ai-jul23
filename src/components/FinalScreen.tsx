@@ -177,7 +177,7 @@ Signed Off: ${currentDeal.createdAt}`;
               </p>
 
               {/* Tag Badges */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+{/*              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
                 <div className="bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-800 font-semibold">
                   <Building className="w-3.5 h-3.5 text-blue-600" />
                   Borrower: <span className="font-bold">{currentDeal.borrowerName}</span>
@@ -190,7 +190,7 @@ Signed Off: ${currentDeal.createdAt}`;
                   <Calendar className="w-3.5 h-3.5 text-amber-600" />
                   Effective Date: <span className="font-bold">{currentDeal.effectiveDate}</span>
                 </div>
-              </div>
+              </div>*/}
             </div>
 
             {/* Stats Matrix */}
