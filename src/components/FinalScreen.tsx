@@ -103,7 +103,7 @@ export const FinalScreen: React.FC<FinalScreenProps> = ({
 
   const handleCopySummary = () => {
     const text = `DEAL CREATION SUMMARY
-Deal ID: ${currentDeal.dealId}
+Workflow ID: ${currentDeal.uuid}
 Borrower: ${currentDeal.borrowerName}
 Deal Name: ${currentDeal.dealName}
 File: ${currentDeal.fileName}
@@ -164,16 +164,15 @@ Signed Off: ${currentDeal.createdAt}`;
             <div className="space-y-3 max-w-2xl">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                Deal Creation Successful • {currentDeal.dealId}
+                Review Sign-off Complete • {currentDeal.uuid}
               </span>
 
               <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Deal creation done successfully!
+                Human review completed successfully.
               </h1>
 
               <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
-                All deal attributes have been parsed, validated, and recorded. The structured credit agreement
-                metadata is now ready for risk analysis, loan syndication, and compliance tracking.
+                Your approved review decisions have been saved to the workflow record.
               </p>
 
               {/* Tag Badges */}

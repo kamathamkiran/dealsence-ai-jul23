@@ -311,9 +311,13 @@ export function mapRawApiToExtractionData(
 ): ExtractionData {
   const rawPayload = (rawInput ?? {}) as Record<string, unknown>;
   const dealPayload = rawPayload.deal && isPlainObject(rawPayload.deal) ? rawPayload.deal : rawPayload;
-  const facilityItems = Array.isArray(dealPayload.facilityList) ? dealPayload.facilityList : [];
+  const facilityItems = Array.isArray(dealPayload.facilities)
+    ? dealPayload.facilities
+    : Array.isArray(dealPayload.facilityList)
+    ? dealPayload.facilityList
+    : [];
 
-  const topLevelSkip = new Set(['facilityList']);
+  const topLevelSkip = new Set(['facilities', 'facilityList']);
   const attributes = collectRawAttributes(dealPayload, [], topLevelSkip);
 
   const facilities: FacilityGroup[] = facilityItems.map((item, idx) => {

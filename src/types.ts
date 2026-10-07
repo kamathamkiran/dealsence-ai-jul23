@@ -103,13 +103,16 @@ export interface ExtractionData {
 
 export interface WorkflowStatusResponse {
   uuid: string;
-  status: 'UPLOADING' | 'PROCESSING' | 'HUMAN APPROVED' | 'COMPLETED';
-  step: number;
-  totalSteps: number;
-  message: string;
-  percentage: number;
-  userName?: string;
+  status: string;
+  nextAgent?: string | null;
+  username?: string;
   updatedAt?: string;
+  completedAt?: string | null;
+  failureReason?: string | null;
+  eventStatus?: string | null;
+  currentAgent?: string | null;
+  failedAgent?: string | null;
+  eventFailureReason?: string | null;
 }
 
 export interface CreateDealResponse {

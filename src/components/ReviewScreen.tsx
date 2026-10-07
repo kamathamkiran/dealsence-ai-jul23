@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 import { PdfViewer } from './PdfViewer';
 import { ExtractionData, DealAttribute, AttributeCategory, AttributeStatus, FacilityGroup } from '../types';
-import { ACTUAL_DEAL_1_EXTRACTION_DATA } from '../data/actualDeal_1';
 import { mapRawApiToExtractionData } from '../data/mapApiResponse';
+import { API_BASE_URL } from '../api';
 
 interface ReviewScreenProps {
   uuid: string;
@@ -34,6 +34,7 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({ uuid, pdfUrl, fileNa
   const [attributes, setAttributes] = useState<DealAttribute[]>([]);
   const [facilities, setFacilities] = useState<FacilityGroup[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Active page & highlighted attribute for PDF viewer jump
   const [activePdfPage, setActivePdfPage] = useState<number>(1);
@@ -57,17 +58,16 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({ uuid, pdfUrl, fileNa
 
   // Is sign-off ready state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [signOffError, setSignOffError] = useState<string | null>(null);
 
-  // Helper: apply extracted data (or fall back to sample_1.json data)
+  // Helper: apply extracted data returned by the backend.
   const applyData = (extracted: ExtractionData) => {
-    const hasAttrs = (extracted.attributes?.length ?? 0) > 0;
-    const source = hasAttrs ? extracted : ACTUAL_DEAL_1_EXTRACTION_DATA;
-    setData(source);
-    setAttributes(source.attributes);
-    setFacilities(source.facilities ?? []);
+    setData(extracted);
+    setAttributes(extracted.attributes);
+    setFacilities(extracted.facilities ?? []);
     // Open all facility accordions by default
     const openMap: Record<string, boolean> = {};
-    (source.facilities ?? []).forEach(f => { openMap[f.facilityName] = true; });
+    (extracted.facilities ?? []).forEach(f => { openMap[f.facilityName] = true; });
     setOpenFacilities(openMap);
   };
 
@@ -76,30 +76,18 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({ uuid, pdfUrl, fileNa
     const fetchExtractedData = async () => {
       setIsLoading(true);
       try {
-        let apiUrl = `http://localhost:8081/api/workflow/${uuid}/metadata`;
-        if (window.location.hostname === 'localhost' && window.location.port === '3000') {
-          apiUrl = `http://localhost:8081/api/workflow/${uuid}/metadata`;
+        const response = await fetch(`${API_BASE_URL}/workflow/${encodeURIComponent(uuid)}/metadata`);
+        if (!response.ok) {
+          const details = await response.text();
+          throw new Error(details || `Could not load workflow output (${response.status}).`);
         }
 
-        let res: Response;
-        try {
-          res = await fetch(apiUrl);
-          console.log("Result : " , res);
-        } catch {
-          res = await fetch(`http://localhost:8081/api/workflow/${uuid}/metadata`);
-        }
-
-        if (res.ok) {
-          const rawPayload = await res.json();
-          const mapped = mapRawApiToExtractionData(rawPayload as Record<string, unknown>, { uuid });
-          applyData(mapped);
-        } else {
-          // API error — use sample_1.json fallback
-          applyData(ACTUAL_DEAL_1_EXTRACTION_DATA);
-        }
-      } catch (e) {
-        console.error('Error fetching extracted data:', e);
-        applyData(ACTUAL_DEAL_1_EXTRACTION_DATA);
+        const rawPayload = await response.json();
+        const mapped = mapRawApiToExtractionData(rawPayload as Record<string, unknown>, { uuid, fileName });
+        applyData(mapped);
+      } catch (error) {
+        console.error('Error fetching extracted data:', error);
+        setLoadError(error instanceof Error ? error.message : 'Could not load workflow output.');
       } finally {
         setIsLoading(false);
       }
@@ -171,12 +159,16 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({ uuid, pdfUrl, fileNa
       prev.map((item) => (item.id === id ? { ...item, value: editValue } : item))
     );
     setFacilities((prev) =>
-      prev.map((fac) => ({
-        ...fac,
-        attributes: fac.attributes.map((item) =>
-          item.id === id ? { ...item, value: editValue } : item
-        )
-      }))
+      prev.map((fac) => {
+        const editedAttribute = fac.attributes.find((item) => item.id === id);
+        return {
+          ...fac,
+          facilityName: editedAttribute?.label === 'Facility Name' ? editValue : fac.facilityName,
+          attributes: fac.attributes.map((item) =>
+            item.id === id ? { ...item, value: editValue } : item
+          )
+        };
+      })
     );
     setEditingAttrId(null);
   };
@@ -242,93 +234,71 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({ uuid, pdfUrl, fileNa
     return jsonResult;
   };
 
-  // Handle Sign Off & Create POST call
+  // Persist review decisions and complete the backend workflow.
   const handleSignOffAndCreate = async () => {
-    setIsSubmitting(true);
     const jsonPairs = createNameValuePairJson();
-    // Snapshot counts at submit time so FinalScreen always reflects the latest review decision state.
     const submitAllFields = [...attributes, ...facilities.flatMap((f) => f.attributes)];
     const submitApprovedCount = submitAllFields.filter((a) => a.status === 'APPROVED').length;
     const submitRejectedCount = submitAllFields.filter((a) => a.status === 'REJECTED').length;
     const submitPendingCount = submitAllFields.filter((a) => a.status === 'PENDING').length;
     const submitTotalFields = submitAllFields.length;
-console.log('Sign-off JSON payload:', jsonPairs);
-    try {
-      let createUrl = '/api/deals/create';
-      if (window.location.hostname === 'localhost' && window.location.port === '3000') {
-        createUrl = 'http://localhost:8081/api/deals/create';
-      }
 
-      const payload = {
-        uuid,
-        fileName: data?.fileName ?? ACTUAL_DEAL_1_EXTRACTION_DATA.fileName,
-        borrowerName: data?.borrowerName ?? ACTUAL_DEAL_1_EXTRACTION_DATA.borrowerName,
+    if (submitTotalFields === 0 || submitApprovedCount !== submitTotalFields) {
+      setSignOffError('Approve all extracted fields before signing off.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSignOffError(null);
+    try {
+      const reviewOutput = {
+        workflowId: uuid,
+        fileName: data?.fileName ?? fileName ?? '',
+        borrowerName: data?.borrowerName ?? '',
         attributes: jsonPairs,
-        Borrower: jsonPairs.dealBorrower?.customerExternalId ?? data?.borrowerName,
-        'Deal Name': jsonPairs.dealName ?? data?.fileName,
-        'Total Aggregate Amount': jsonPairs.globalDealProposedCommitmentAmount ?? jsonPairs.totalAggregateAmount,
-        'Effective Date': jsonPairs.agreementDate ?? jsonPairs.effectiveDate
+        reviewedFields: submitAllFields.map(({ id, label, value, status }) => ({ id, label, value, status })),
+        approvedFields: submitApprovedCount,
+        rejectedFields: submitRejectedCount,
+        pendingFields: submitPendingCount,
       };
 
-      let res: Response;
-      try {
-        res = await fetch(createUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } catch {
-        res = await fetch('/workflow/create/deal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+      const response = await fetch(`${API_BASE_URL}/workflow/${encodeURIComponent(uuid)}/sign-off`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewOutput),
+      });
+      if (!response.ok) {
+        throw new Error((await response.text()) || `Sign-off failed with status ${response.status}`);
       }
 
-      if (res.ok) {
-        const createResponse = await res.json();
-        const normalizedResponse = {
-          ...createResponse,
-          deal: {
-            ...(createResponse?.deal ?? {}),
-            totalFields: submitTotalFields,
-            approvedFields: submitApprovedCount,
-            rejectedFields: submitRejectedCount,
-            pendingFields: submitPendingCount,
-          },
-        };
-        onSignOffComplete(normalizedResponse);
-      } else {
-        throw new Error('Failed to create deal via API');
-      }
-    } catch (e) {
-      console.error('Create deal error:', e);
-      // Fallback sign-off using actual loaded data
+      const result = await response.json() as { workflowId: string; status: string; completedAt: string };
+      const valueFor = (label: string) => submitAllFields.find((field) => field.label === label)?.value ?? '';
       onSignOffComplete({
         success: true,
-        dealId: `DEAL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-        status: 'DEAL_CREATED',
-        message: 'Deal creation done successfully!',
+        workflowId: result.workflowId,
+        status: result.status,
+        message: 'Human review completed and saved.',
+        timestamp: result.completedAt,
         deal: {
-          dealId: `DEAL-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          dealId: result.workflowId,
           uuid,
-          borrowerName: data?.borrowerName ?? ACTUAL_DEAL_1_EXTRACTION_DATA.borrowerName,
-          dealName: jsonPairs.dealName ?? data?.fileName ?? ACTUAL_DEAL_1_EXTRACTION_DATA.fileName,
-          fileName: data?.fileName ?? ACTUAL_DEAL_1_EXTRACTION_DATA.fileName,
-          effectiveDate: jsonPairs.agreementDate ?? jsonPairs.effectiveDate ?? 'N/A',
-          totalAmount: jsonPairs.globalDealProposedCommitmentAmount ?? jsonPairs.totalAggregateAmount ?? 'N/A',
-          createdAt: new Date().toLocaleString(),
+          borrowerName: data?.borrowerName ?? 'N/A',
+          dealName: data?.fileName?.replace(/\.pdf$/i, '') ?? fileName?.replace(/\.pdf$/i, '') ?? 'Credit Agreement',
+          fileName: data?.fileName ?? fileName ?? '',
+          effectiveDate: valueFor('Effective Date') || valueFor('Agreement Date') || 'N/A',
+          totalAmount: valueFor('Global Deal Proposed Commitment Amount') || 'N/A',
+          createdAt: result.completedAt,
           totalFields: submitTotalFields,
           approvedFields: submitApprovedCount,
           rejectedFields: submitRejectedCount,
           pendingFields: submitPendingCount,
           status: 'SIGNED_OFF',
-          attributes: Object.fromEntries(
-            Object.entries(jsonPairs).filter(([key]) => key !== 'facilityList') as Array<[string, string]>
-          ),
+          attributes: Object.fromEntries(submitAllFields.map(({ label, value }) => [label, value])),
           facilityList: Array.isArray(jsonPairs.facilityList) ? jsonPairs.facilityList : []
         }
       });
+    } catch (error) {
+      setSignOffError(error instanceof Error ? error.message : 'Unable to complete workflow sign-off.');
     } finally {
       setIsSubmitting(false);
     }
@@ -352,6 +322,17 @@ console.log('Sign-off JSON payload:', jsonPairs);
           <p className="text-xs font-semibold text-slate-600">
             Parsing extracted credit agreement JSON attributes...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <div className="h-[calc(100vh-57px)] flex items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-lg text-center">
+          <h2 className="text-sm font-bold text-slate-900">Workflow output unavailable</h2>
+          <p className="mt-2 text-xs text-rose-700">{loadError ?? 'No extraction result was returned by the backend.'}</p>
         </div>
       </div>
     );
@@ -663,9 +644,47 @@ console.log('Sign-off JSON payload:', jsonPairs);
                                 </button>
                               </div>
 
-                              <div className="p-2 bg-slate-50 rounded border border-slate-200 text-xs font-semibold text-slate-900">
-                                {attr.value}
-                              </div>
+                              {editingAttrId === attr.id ? (
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={editValue}
+                                    onChange={(event) => setEditValue(event.target.value)}
+                                    className="flex-1 min-w-0 px-2 py-1.5 border border-blue-500 rounded text-xs font-semibold text-slate-900 focus:outline-none bg-blue-50/30"
+                                    aria-label={`Edit ${attr.label}`}
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEdit(attr.id)}
+                                    className="px-2.5 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingAttrId(null)}
+                                    className="px-2 py-1.5 border border-slate-300 text-slate-600 rounded text-xs font-medium hover:bg-slate-100"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 min-w-0 p-2 bg-slate-50 rounded border border-slate-200 text-xs font-semibold text-slate-900 break-words">
+                                    {attr.value}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(attr)}
+                                    title={`Edit ${attr.label}`}
+                                    aria-label={`Edit ${attr.label}`}
+                                    className="shrink-0 p-1.5 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
 
                               <div className="flex justify-between items-center pt-1 text-xs">
                                 <span className="text-[11px] font-bold text-emerald-600">{attr.confidence}% Confidence</span>
@@ -767,7 +786,9 @@ console.log('Sign-off JSON payload:', jsonPairs);
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-end gap-2">
+              {signOffError && <p role="alert" className="text-xs text-rose-700">{signOffError}</p>}
+              <div className="flex items-center gap-2">
               <button
                 onClick={handleResetAll}
                 className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1 transition-colors"
@@ -802,10 +823,11 @@ console.log('Sign-off JSON payload:', jsonPairs);
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    Sign Off and Create
+                    Sign Off Workflow
                   </>
                 )}
               </button>
+              </div>
             </div>
           </div>
         </div>

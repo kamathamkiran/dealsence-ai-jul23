@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Header } from './components/Header';
-import { UploadScreen } from './components/UploadScreen';
+import { UploadScreen } from './components/UploadFlowScreen';
 import { ReviewScreen } from './components/ReviewScreen';
 import { FinalScreen } from './components/FinalScreen';
 import { LoginScreen } from './components/LoginScreen.tsx';
-import { ACTUAL_DEAL_1_EXTRACTION_DATA } from './data/actualDeal_1';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [currentScreen, setCurrentScreen] = useState<'upload' | 'review' | 'final'>('upload');
-  const [workflowUuid, setWorkflowUuid] = useState<string>('actual-deal-1-uuid-001');
+  const [workflowUuid, setWorkflowUuid] = useState<string>('');
   const [fileInfo, setFileInfo] = useState<{ name: string; size: string }>({
     name: '',
     size: 'N/A'
@@ -65,8 +64,6 @@ export default function App() {
           <Header
             currentScreen={currentScreen}
             fileName={fileInfo.name}
-            borrowerName={ACTUAL_DEAL_1_EXTRACTION_DATA.borrowerName}
-            pageCount={ACTUAL_DEAL_1_EXTRACTION_DATA.pageCount}
             onNavigateUpload={() => setCurrentScreen('upload')}
             onNavigateReview={() => setCurrentScreen('review')}
           />

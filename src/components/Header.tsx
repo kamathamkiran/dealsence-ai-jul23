@@ -1,6 +1,5 @@
 import React from 'react';
 import { FileText, Sparkles, CheckCircle2, ArrowLeft, RefreshCw, PlusCircle } from 'lucide-react';
-import { DEFAULT_DEAL_NAME, ACTUAL_DEAL_1_EXTRACTION_DATA } from '../data/actualDeal_1';
 
 interface HeaderProps {
   currentScreen: 'upload' | 'review' | 'final';
@@ -16,10 +15,10 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentScreen,
   fileName,
-  pageCount = ACTUAL_DEAL_1_EXTRACTION_DATA.pageCount,
-  borrowerName = ACTUAL_DEAL_1_EXTRACTION_DATA.borrowerName,
+  pageCount,
+  borrowerName,
   reviewedCount = 0,
-  totalCount = ACTUAL_DEAL_1_EXTRACTION_DATA.attributes.length,
+  totalCount = 0,
   onNavigateUpload,
   onNavigateReview,
 }) => {
@@ -62,12 +61,14 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-900 text-sm">{fileName || 'Uploaded Document.pdf'}</span>
-                <span className="bg-slate-100 text-slate-600 text-[11px] font-medium px-2 py-0.5 rounded border border-slate-200">
-                  {pageCount} Pages
-                </span>
+                {pageCount ? (
+                  <span className="bg-slate-100 text-slate-600 text-[11px] font-medium px-2 py-0.5 rounded border border-slate-200">
+                    {pageCount} Pages
+                  </span>
+                ) : null}
               </div>
               <p className="text-xs text-slate-500">
-                {ACTUAL_DEAL_1_EXTRACTION_DATA.documentType} • {borrowerName}
+                {borrowerName || 'Credit Agreement'}
               </p>
             </div>
           </div>
@@ -102,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-            DEAL PIPELINE • SIGNED OFF
+            HUMAN REVIEW • COMPLETED
           </span>
           <span className="font-bold text-slate-900 text-base">{borrowerName}</span>
           <span className="bg-blue-50 text-blue-700 text-xs font-medium px-2.5 py-0.5 rounded-full border border-blue-200">
